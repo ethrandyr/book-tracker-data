@@ -1,0 +1,66 @@
+// server.js
+const express = require('express');
+const axios = require('axios');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const ACCESS_TOKEN = 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;
+const REPO_OWNER = ethrandyr;
+const REPO_NAME = 'book-tracker-data';
+const FILE_PATH = 'book_data.json';
+
+app.use(express.json());
+
+app.get('/api/books', async (req, res) => {
+  try {
+    const response = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`, {
+      headers: {
+        'Authorization': `token ${ACCESS_TOKEN}`
+      }
+    });
+
+    const content = Buffer.from(response.data.content, 'base64').toString('utf-8');
+    const bookData = JSON.parse(content);
+    res.json(bookData);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/books', async (req, res) => {
+  try {
+    const { bookTitle, author } = req.body;
+    const bookData = { bookTitle, author };
+
+    const response = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`, {
+      headers: {
+        'Authorization': `token ${ACCESS_TOKEN}`
+      }
+    });
+
+    const existingData = JSON.parse(Buffer.from(response.data.content, 'base64').toString('utf-8'));
+    existingData.push(bookData);
+
+    const encodedContent = Buffer.from(JSON.stringify(existingData)).toString('base64');
+    await axios.put(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${FILE_PATH}`, {
+      message: 'Update book_data.json',
+      content: encodedContent,
+      sha: response.data.sha
+    }, {
+      headers: {
+        'Authorization': `token ${ACCESS_TOKEN}`
+      }
+    });
+
+    res.json({ message: 'Book saved successfully!' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
